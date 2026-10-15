@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f7f5">
+  <title>AquaTrace — Water quality console</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172b2b;
+      --muted: #71817c;
+      --line: #e5ebe7;
+      --canvas: #f4f7f5;
+      --surface: #fff;
+      --green: #196b55;
+      --green-dark: #10513f;
+      --mint: #e8f3ed;
+      --yellow: #f0b94c;
+      --red: #bd5247;
+      --shadow: 0 16px 44px rgba(25, 52, 42, .07);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      background: var(--canvas);
+      color: var(--ink);
+      font: 15px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible {
+      outline: 3px solid rgba(25, 107, 85, .25);
+      outline-offset: 2px;
+    }
+    .shell { width: min(1180px, 100%); min-height: 100vh; margin: 0 auto; padding: 28px 34px 34px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark {
+      display: grid; width: 42px; height: 42px; place-items: center; border-radius: 14px;
+      background: var(--green); color: white; box-shadow: 0 7px 16px rgba(25, 107, 85, .2);
+    }
+    .brand-mark svg { width: 22px; height: 22px; }
+    .brand-name { font-size: 18px; font-weight: 750; letter-spacing: -.04em; }
+    .brand-caption { color: var(--muted); font-size: 12px; }
+    .prototype-pill {
+      display: inline-flex; align-items: center; gap: 8px; padding: 7px 11px;
+      border: 1px solid #e5dcbf; border-radius: 999px; background: #fffaf0; color: #85652c;
+      font-size: 12px; font-weight: 650;
+    }
+    .prototype-pill::before { width: 7px; height: 7px; border-radius: 50%; background: var(--yellow); content: ""; }
+    .layout { display: grid; grid-template-columns: 238px minmax(0, 1fr); gap: 24px; align-items: start; }
+    .sidebar, .workspace { border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
+    .sidebar { position: sticky; top: 20px; padding: 20px 14px 14px; }
+    .nav-label { padding: 0 11px; color: #98a59f; font-size: 10px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }
+    .nav-list { display: grid; gap: 5px; margin: 12px 0 0; padding: 0; list-style: none; }
+    .nav-button {
+      display: flex; width: 100%; align-items: center; gap: 11px; padding: 11px;
+      border: 0; border-radius: 10px; background: transparent; color: #60716a; text-align: left;
+      transition: background .15s ease, color .15s ease;
+    }
+    .nav-button:hover { background: #f4f7f5; color: var(--ink); }
+    .nav-button[aria-current="page"] { background: var(--mint); color: var(--green-dark); font-weight: 700; }
+    .nav-icon { display: grid; width: 23px; place-items: center; font-size: 17px; }
+    .nav-number { margin-left: auto; color: #9aa8a2; font-size: 11px; font-variant-numeric: tabular-nums; }
+    .sidebar-note { margin: 24px 3px 0; padding: 14px 12px; border-radius: 12px; background: #f7f9f7; color: var(--muted); font-size: 12px; }
+    .sidebar-note strong { display: block; margin-bottom: 4px; color: var(--ink); font-size: 12px; }
+    .workspace { min-height: 620px; overflow: hidden; }
+    .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; padding: 27px 30px 22px; border-bottom: 1px solid var(--line); }
+    .eyebrow { margin: 0 0 6px; color: var(--green); font-size: 11px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(24px, 3vw, 31px); line-height: 1.2; letter-spacing: -.045em; }
+    .subtitle { margin: 8px 0 0; color: var(--muted); font-size: 14px; }
+    .head-count { flex: none; padding: 8px 11px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); font-size: 12px; }
+    .page-content { padding: 25px 30px 30px; }
+    .welcome-card {
+      position: relative; overflow: hidden; padding: 24px; border-radius: 15px;
+      background: linear-gradient(115deg, #155c49 0%, #287760 70%, #3d8b70 100%); color: white;
+    }
+    .welcome-card::after {
+      position: absolute; right: -35px; bottom: -95px; width: 250px; height: 250px;
+      border: 1px solid rgba(255,255,255,.14); border-radius: 50%; box-shadow: 0 0 0 25px rgba(255,255,255,.035), 0 0 0 55px rgba(255,255,255,.03); content: "";
+    }
+    .welcome-card .eyebrow { color: #b8e1cb; }
+    .welcome-card h2 { position: relative; z-index: 1; max-width: 440px; margin: 0; font-size: 24px; letter-spacing: -.04em; }
+    .welcome-card p { position: relative; z-index: 1; max-width: 450px; margin: 9px 0 0; color: #d1e8dd; font-size: 13px; }
+    .section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 25px 0 12px; }
+    .section-heading h2 { margin: 0; font-size: 15px; letter-spacing: -.02em; }
+    .section-heading span { color: var(--muted); font-size: 12px; }
+    .action-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+    .action-card {
+      display: flex; min-height: 84px; align-items: center; gap: 13px; padding: 15px;
+      border: 1px solid var(--line); border-radius: 12px; background: white; color: inherit;
+      text-align: left; transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease;
+    }
+    .action-card:hover { transform: translateY(-2px); border-color: #b8d4c8; box-shadow: 0 8px 20px rgba(25,52,42,.06); }
+    .action-icon { display: grid; width: 39px; height: 39px; flex: none; place-items: center; border-radius: 11px; background: var(--mint); color: var(--green); font-size: 18px; }
+    .action-copy { min-width: 0; }
+    .action-copy strong { display: block; font-size: 13px; }
+    .action-copy small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
+    .action-arrow { margin-left: auto; color: #9aa8a2; font-size: 19px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 11px; margin-top: 20px; }
+    .stat { padding: 14px 15px; border: 1px solid var(--line); border-radius: 12px; }
+    .stat-label { color: var(--muted); font-size: 11px; }
+    .stat-value { margin-top: 4px; font-size: 22px; font-weight: 750; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+    .stat-value.alert { color: var(--red); }
+    .info-note { margin-top: 20px; padding: 12px 14px; border: 1px solid #f0e5c8; border-radius: 10px; background: #fffbf2; color: #796943; font-size: 12px; }
+    .form-card { max-width: 650px; padding: 20px; border: 1px solid var(--line); border-radius: 13px; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
+    .field { display: grid; gap: 6px; }
+    .field.full { grid-column: 1 / -1; }
+    .field label { color: #4d6058; font-size: 12px; font-weight: 700; }
+    .field input, .field select {
+      width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid #dce5df;
+      border-radius: 8px; background: white; color: var(--ink);
+    }
+    .field input:disabled { background: #f5f7f5; color: #73817b; }
+    .field-hint { color: var(--muted); font-size: 11px; }
+    .form-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 20px; }
+    .button {
+      min-height: 40px; padding: 9px 15px; border: 1px solid transparent; border-radius: 8px;
+      background: var(--green); color: white; font-size: 13px; font-weight: 700;
+    }
+    .button:hover { background: var(--green-dark); }
+    .button.secondary { border-color: var(--line); background: white; color: #53655d; }
+    .button.secondary:hover { background: #f5f8f6; }
+    .button-link { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+    .form-message { margin: 12px 0 0; color: var(--red); font-size: 12px; }
+    .form-message:empty { display: none; }
+    .reading-list { display: grid; gap: 12px; }
+    .reading-card { padding: 17px 18px; border: 1px solid var(--line); border-radius: 12px; }
+    .reading-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .reading-location { margin: 0; font-size: 15px; font-weight: 750; }
+    .reading-meta { margin-top: 3px; color: var(--muted); font-size: 11px; }
+    .source-tag { padding: 4px 8px; border-radius: 999px; background: #f0f3f1; color: #75827c; font-size: 10px; font-weight: 700; white-space: nowrap; }
+    .measurements { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 9px; margin-top: 15px; }
+    .measurement { padding: 10px; border-radius: 9px; background: #f7f9f7; }
+    .measurement-label { color: var(--muted); font-size: 10px; }
+    .measurement-value { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; font-size: 14px; font-weight: 750; }
+    .status-tag { padding: 2px 6px; border-radius: 999px; background: #e8f3ed; color: #286b52; font-size: 9px; font-weight: 700; }
+    .status-tag.bad { background: #fbefec; color: #a8473e; }
+    .problem-location { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+    .problem-location .button { flex: none; }
+    .issue-note { margin-top: 12px; color: #4d6058; font-size: 12px; }
+    .issue-photo-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .issue-photo-grid img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); background: #f4f7f5; }
+    .image-preview { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .image-preview img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); background: #f4f7f5; }
+    .empty-state { padding: 30px 20px; border: 1px dashed #d8e2dc; border-radius: 12px; color: var(--muted); text-align: center; }
+    .empty-state strong { display: block; margin-bottom: 4px; color: var(--ink); }
+    .quit-card { max-width: 560px; padding: 27px; border: 1px solid var(--line); border-radius: 14px; background: #fbfcfb; text-align: center; }
+    .quit-icon { display: grid; width: 52px; height: 52px; margin: 0 auto 13px; place-items: center; border-radius: 50%; background: var(--mint); color: var(--green); font-size: 23px; }
+    .quit-card h2 { margin: 0; font-size: 21px; letter-spacing: -.04em; }
+    .quit-card p { max-width: 370px; margin: 8px auto 19px; color: var(--muted); font-size: 13px; }
+    .toast { min-height: 0; margin: 0 30px; color: var(--green-dark); font-size: 12px; }
+    .toast.error { color: var(--red); }
+    .toast:not(:empty) { padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: #f7faf8; }
+    .toast.error:not(:empty) { border-color: #f1d7d2; background: #fff7f5; }
+    .workspace.is-quit .page-content { display: grid; min-height: 510px; place-items: center; }
+    @media (max-width: 760px) {
+      .shell { padding: 20px 16px; }
+      .layout { grid-template-columns: 1fr; gap: 14px; }
+      .sidebar { position: static; padding: 12px; }
+      .nav-label, .sidebar-note { display: none; }
+      .nav-list { grid-template-columns: repeat(5, minmax(0,1fr)); gap: 4px; margin: 0; }
+      .nav-button { flex-direction: column; justify-content: center; gap: 3px; min-height: 66px; padding: 7px 3px; text-align: center; font-size: 10px; }
+      .nav-icon { font-size: 16px; }
+      .nav-number { display: none; }
+      .workspace { min-height: 0; }
+      .page-head { padding: 22px 20px 18px; }
+      .page-content { padding: 20px; }
+      .toast { margin: 0 20px; }
+    }
+    @media (max-width: 480px) {
+      .shell { padding: 15px 11px; }
+      .topbar { margin-bottom: 16px; }
+      .brand-caption { font-size: 10px; }
+      .prototype-pill { padding: 6px 8px; font-size: 10px; }
+      .page-head { padding-right: 16px; padding-left: 16px; }
+      .page-content { padding: 16px; }
+      .welcome-card { padding: 20px; }
+      .welcome-card h2 { font-size: 21px; }
+      .action-grid { grid-template-columns: 1fr; }
+      .stats-grid { gap: 7px; }
+      .stat { padding: 11px 9px; }
+      .stat-value { font-size: 19px; }
+      .form-card { padding: 15px; }
+      .form-grid { grid-template-columns: 1fr; }
+      .field.full { grid-column: auto; }
+      .measurements { gap: 6px; }
+      .measurement { padding: 8px 7px; }
+      .measurement-value { font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 2.8S5.5 10 5.5 14.8a6.5 6.5 0 0 0 13 0C18.5 10 12 2.8 12 2.8Z" stroke="currentColor" stroke-width="1.8"/><path d="M9 15.2c.2 1.5 1.2 2.4 2.8 2.7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        </div>
+        <div><div class="brand-name">AquaTrace</div><div class="brand-caption">Water quality monitoring prototype</div></div>
+      </div>
+      <div class="prototype-pill">Preview mode</div>
+    </header>
+
+    <div class="layout">
+      <nav class="sidebar" aria-label="Main menu">
+        <div class="nav-label">Console menu</div>
+        <ul class="nav-list">
+          <li><button class="nav-button" data-screen="add" aria-current="false"><span class="nav-icon" aria-hidden="true">＋</span><span>Add a reading</span><span class="nav-number">1</span></button></li>
+          <li><button class="nav-button" data-screen="readings" aria-current="false"><span class="nav-icon" aria-hidden="true">▤</span><span>See saved readings</span><span class="nav-number">2</span></button></li>
+          <li><button class="nav-button" data-screen="limits" aria-current="false"><span class="nav-icon" aria-hidden="true">⌁</span><span>Change limits</span><span class="nav-number">3</span></button></li>
+          <li><button class="nav-button" data-screen="problems" aria-current="false"><span class="nav-icon" aria-hidden="true">⌖</span><span>Problem locations</span><span class="nav-number">4</span></button></li>
+          <li><button class="nav-button" data-screen="quit" aria-current="false"><span class="nav-icon" aria-hidden="true">↗</span><span>Quit</span><span class="nav-number">5</span></button></li>
+        </ul>
+        <div class="sidebar-note"><strong>Screening only</strong>These readings check pH, turbidity and dissolved oxygen. They cannot confirm that water is safe to drink.</div>
+      </nav>
+
+      <main class="workspace" id="workspace">
+        <div class="page-head">
+          <div><p class="eyebrow" id="eyebrow">AquaTrace console</p><h1 id="pageTitle">Water quality at a glance</h1><p class="subtitle" id="pageSubtitle">Choose an option from the menu to try the prototype.</p></div>
+          <div class="head-count" id="readingCount">0 saved readings</div>
+        </div>
+        <div class="toast" id="toast" role="status" aria-live="polite"></div>
+        <section class="page-content" id="pageContent"></section>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const STORAGE_KEY = "aquatrace-preview-state-v1";
+      const DEFAULT_LIMITS = { phMin: 6.5, phMax: 8.5, turbidity: 1, oxygen: 7 };
+      const demoReadings = [
+        { timestamp: "2026-10-11 14:24:01", location: "Hostel water tank A", ph: 6.5, turbidity: 7, oxygen: 6.8, source: "Demo" },
+        { timestamp: "2026-10-11 14:28:21", location: "North campus tap", ph: 7.2, turbidity: 0.6, oxygen: 8.5, source: "Demo" }
+      ];
+      const headings = {
+        home: ["AquaTrace console", "Water quality at a glance", "Choose an option from the menu to try the prototype."],
+        add: ["New sample", "Add a reading", "Enter measurements or use the built-in demo values."],
+        readings: ["History", "Saved readings", "Review readings recorded in this browser preview."],
+        limits: ["Screening settings", "Change limits", "Update the thresholds used to screen new readings."],
+        problems: ["Issue map", "Problem locations", "View all reports that need review and open each location in a map."],
+        quit: ["Session", "Quit AquaTrace", "End this preview session."]
+      };
+      const content = document.getElementById("pageContent");
+      const workspace = document.getElementById("workspace");
+      const toast = document.getElementById("toast");
+      const count = document.getElementById("readingCount");
+      let currentScreen = "home";
+      let toastTimer;
+      let startupError = "";
+
+      function initialState() {
+        return { limits: { ...DEFAULT_LIMITS }, readings: demoReadings.map(item => ({ ...item })) };
+      }
+
+      function loadState() {
+        try {
+          const stored = localStorage.getItem(STORAGE_KEY);
+          if (!stored) return initialState();
+          const parsed = JSON.parse(stored);
+          if (!parsed || !Array.isArray(parsed.readings) || !parsed.limits) throw new Error("Saved preview data has an invalid format.");
+          const limits = parsed.limits;
+          for (const key of Object.keys(DEFAULT_LIMITS)) {
+            if (!Number.isFinite(limits[key]) || limits[key] < 0) throw new Error("Saved preview limits are invalid.");
+          }
+          if (limits.phMin > limits.phMax || limits.phMax > 14 || limits.oxygen > 20) throw new Error("Saved preview limits are out of range.");
+          return { limits: { ...limits }, readings: parsed.readings };
+        } catch (error) {
+          startupError = `Could not load saved preview data: ${error.message}`;
+          return initialState();
+        }
+      }
+
+      let state = loadState();
+
+      function persist() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+          return "";
+        } catch (error) {
+          return `Your change is active for this visit, but could not be saved in this browser: ${error.message}`;
+        }
+      }
+
+      function reportSave(result, successMessage) {
+        showToast(result || successMessage, Boolean(result));
+      }
+
+      function showToast(message, isError = false) {
+        clearTimeout(toastTimer);
+        toast.textContent = message;
+        toast.classList.toggle("error", isError);
+        if (message) toastTimer = setTimeout(() => { toast.textContent = ""; toast.classList.remove("error"); }, 5000);
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, char => ({
+          "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+        })[char]);
+      }
+
+      function setHeading(screen) {
+        const [eyebrow, title, subtitle] = headings[screen];
+        document.getElementById("eyebrow").textContent = eyebrow;
+        document.getElementById("pageTitle").textContent = title;
+        document.getElementById("pageSubtitle").textContent = subtitle;
+        count.textContent = `${state.readings.length} saved ${state.readings.length === 1 ? "reading" : "readings"}`;
+        document.querySelectorAll(".nav-button").forEach(button => {
+          if (button.dataset.screen === screen) button.setAttribute("aria-current", "page");
+          else button.removeAttribute("aria-current");
+        });
+        workspace.classList.toggle("is-quit", screen === "quit");
+      }
+
+      function go(screen) {
+        currentScreen = screen;
+        setHeading(screen);
+        showToast("");
+        if (screen === "home") renderHome();
+        if (screen === "add") renderAdd();
+        if (screen === "readings") renderReadings();
+        if (screen === "limits") renderLimits();
+        if (screen === "problems") renderProblems();
+        if (screen === "quit") renderQuit();
+      }
+
+      function renderHome() {
+        const issueCount = state.readings.filter(item => {
+          const status = statuses(item);
+          return status.ph.bad || status.turbidity.bad || status.oxygen.bad;
+        }).length;
+        content.innerHTML = `
+          <div class="welcome-card">
+            <p class="eyebrow">Field monitoring · screening prototype</p>
+            <h2>Clearer water insights start with a single reading.</h2>
+            <p>Record a sample, check it against your screening limits, and keep a local history of results.</p>
+          </div>
+          <div class="section-heading"><h2>What would you like to do?</h2><span>Console menu</span></div>
+          <div class="action-grid">
+            <button class="action-card" data-go="add"><span class="action-icon" aria-hidden="true">＋</span><span class="action-copy"><strong>Add a reading</strong><small>Enter a sample or try demo values</small></span><span class="action-arrow" aria-hidden="true">›</span></button>
+            <button class="action-card" data-go="readings"><span class="action-icon" aria-hidden="true">▤</span><span class="action-copy"><strong>See saved readings</strong><small>Browse your local sample history</small></span><span class="action-arrow" aria-hidden="true">›</span></button>
+            <button class="action-card" data-go="limits"><span class="action-icon" aria-hidden="true">⌁</span><span class="action-copy"><strong>Change limits</strong><small>Adjust screening thresholds</small></span><span class="action-arrow" aria-hidden="true">›</span></button>
+            <button class="action-card" data-go="problems"><span class="action-icon" aria-hidden="true">⌖</span><span class="action-copy"><strong>Problem locations</strong><small>Review flagged samples and open their map locations</small></span><span class="action-arrow" aria-hidden="true">›</span></button>
+            <button class="action-card" data-go="quit"><span class="action-icon" aria-hidden="true">↗</span><span class="action-copy"><strong>Quit</strong><small>End this preview session</small></span><span class="action-arrow" aria-hidden="true">›</span></button>
+          </div>
+          <div class="stats-grid">
+            <div class="stat"><div class="stat-label">Readings saved</div><div class="stat-value">${state.readings.length}</div></div>
+            <div class="stat"><div class="stat-label">Flagged for review</div><div class="stat-value ${issueCount ? "alert" : ""}">${issueCount}</div></div>
+            <div class="stat"><div class="stat-label">pH screening range</div><div class="stat-value">${state.limits.phMin}–${state.limits.phMax}</div></div>
+          </div>
+          <div class="info-note"><strong>Prototype note:</strong> Typed-in readings are not real sensor measurements. Screening only checks pH, turbidity and dissolved oxygen; it cannot determine whether water is safe to drink.</div>
+        `;
+        content.querySelectorAll("[data-go]").forEach(button => button.addEventListener("click", () => go(button.dataset.go)));
+      }
+
+      function renderAdd() {
+        content.innerHTML = `
+          <form class="form-card" id="readingForm" novalidate>
+            <div class="form-grid">
+              <div class="field full"><label for="location">Sample location</label><input id="location" name="location" maxlength="100" placeholder="e.g. Hostel water tank A" required><span class="field-hint">Use a descriptive location so you can find this sample later.</span></div>
+              <div class="field full"><label for="entryMode">Reading source</label><select id="entryMode" name="entryMode"><option value="manual">Type readings</option><option value="demo">Use demo readings (not from a real sensor)</option></select></div>
+              <div class="field"><label for="ph">pH</label><input id="ph" name="ph" type="number" min="0" max="14" step="any" value="7.0" required></div>
+              <div class="field"><label for="turbidity">Turbidity (NTU)</label><input id="turbidity" name="turbidity" type="number" min="0" step="any" value="0.5" required></div>
+              <div class="field"><label for="oxygen">Dissolved oxygen (mg/L)</label><input id="oxygen" name="oxygen" type="number" min="0" max="20" step="any" value="7.0" required></div>
+              <div class="field full"><label for="issuePhoto">Add issue photos</label><input id="issuePhoto" name="issuePhoto" type="file" accept="image/*" multiple><span class="field-hint">Upload photos of the issue. They are stored locally in this browser.</span></div>
+              <div class="field full"><label for="issueNote">Issue note</label><textarea id="issueNote" name="issueNote" rows="3" placeholder="Describe the issue you found"></textarea></div>
+              <div class="field full" id="photoPreviewWrap" style="display:none;"><label>Selected photos</label><div class="image-preview" id="imagePreview"></div></div>
+            </div>
+            <p class="form-message" id="readingError" role="alert"></p>
+            <div class="form-actions"><button class="button" type="submit">Save reading</button><button class="button secondary" type="button" data-cancel>Cancel</button></div>
+          </form>
+          <div class="info-note">Current screening limits: pH ${state.limits.phMin}–${state.limits.phMax}, turbidity ≤ ${state.limits.turbidity} NTU, dissolved oxygen ≥ ${state.limits.oxygen} mg/L.</div>
+        `;
+        const form = document.getElementById("readingForm");
+        const mode = document.getElementById("entryMode");
+        let selectedPhotos = [];
+        const fileInput = document.getElementById("issuePhoto");
+        const photoPreview = document.getElementById("imagePreview");
+        const photoPreviewWrap = document.getElementById("photoPreviewWrap");
+
+        fileInput.addEventListener("change", async () => {
+          const files = Array.from(fileInput.files || []);
+          if (!files.length) { selectedPhotos = []; photoPreviewWrap.style.display = "none"; photoPreview.innerHTML = ""; return; }
+          selectedPhotos = await Promise.all(files.map(file => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          })));
+          photoPreview.innerHTML = selectedPhotos.map(src => `<img src="${src}" alt="Issue preview">`).join("");
+          photoPreviewWrap.style.display = "block";
+        });
+
+        mode.addEventListener("change", () => {
+          const isDemo = mode.value === "demo";
+          const values = isDemo ? [5.8, 4.2, 6.8] : [7, 0.5, 7];
+          ["ph", "turbidity", "oxygen"].forEach((name, index) => {
+            form.elements[name].value = values[index];
+            form.elements[name].disabled = isDemo;
+          });
+        });
+        form.addEventListener("submit", event => {
+          event.preventDefault();
+          const error = document.getElementById("readingError");
+          const location = form.elements.location.value.trim();
+          const issueNote = form.elements.issueNote.value.trim();
+          const values = ["ph", "turbidity", "oxygen"].map(name => Number(form.elements[name].value));
+          const [ph, turbidity, oxygen] = values;
+          if (!location) { error.textContent = "Enter a sample location before saving."; form.elements.location.focus(); return; }
+          if (values.some(value => !Number.isFinite(value))) { error.textContent = "Enter a valid number for each measurement."; return; }
+          if (ph < 0 || ph > 14 || turbidity < 0 || oxygen < 0 || oxygen > 20) { error.textContent = "Check the allowed ranges: pH 0–14, turbidity 0 or higher, dissolved oxygen 0–20 mg/L."; return; }
+          state.readings.unshift({
+            timestamp: new Date().toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+            location, ph, turbidity, oxygen, source: mode.value === "demo" ? "Demo" : "Typed",
+            issueNote,
+            issuePhotos: selectedPhotos
+          });
+          const saveResult = persist();
+          go("readings");
+          reportSave(saveResult, "Reading and issue photos saved to this browser preview.");
+        });
+        content.querySelector("[data-cancel]").addEventListener("click", () => go("home"));
+      }
+
+      function statuses(item) {
+        return {
+          ph: { label: item.ph < state.limits.phMin || item.ph > state.limits.phMax ? "Outside range" : "Within range", bad: item.ph < state.limits.phMin || item.ph > state.limits.phMax },
+          turbidity: { label: item.turbidity > state.limits.turbidity ? "Above limit" : "Within limit", bad: item.turbidity > state.limits.turbidity },
+          oxygen: { label: item.oxygen < state.limits.oxygen ? "Below minimum" : "Meets minimum", bad: item.oxygen < state.limits.oxygen }
+        };
+      }
+
+      function isProblem(item) {
+        const status = statuses(item);
+        return status.ph.bad || status.turbidity.bad || status.oxygen.bad ||
+          Boolean(item.issueNote && item.issueNote.trim()) ||
+          Boolean(Array.isArray(item.issuePhotos) && item.issuePhotos.length);
+      }
+
+      function mapSearchUrl(location) {
+        return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+      }
+
+      function renderProblems() {
+        const problems = state.readings.filter(isProblem);
+        if (!problems.length) {
+          content.innerHTML = `<div class="empty-state"><strong>No problem locations recorded.</strong>Readings outside a screening limit, or reports with an issue note or photo, will appear here.<div class="form-actions" style="justify-content:center"><button class="button" data-add>＋ Add a reading</button></div></div>`;
+          content.querySelector("[data-add]").addEventListener("click", () => go("add"));
+          return;
+        }
+
+        const cards = problems.map(item => {
+          const status = statuses(item);
+          const reasons = [];
+          if (status.ph.bad) reasons.push(`pH ${status.ph.label.toLowerCase()}`);
+          if (status.turbidity.bad) reasons.push(`turbidity ${status.turbidity.label.toLowerCase()}`);
+          if (status.oxygen.bad) reasons.push(`dissolved oxygen ${status.oxygen.label.toLowerCase()}`);
+          if (item.issueNote && item.issueNote.trim()) reasons.push("issue report");
+          if (Array.isArray(item.issuePhotos) && item.issuePhotos.length) reasons.push(`${item.issuePhotos.length} photo${item.issuePhotos.length === 1 ? "" : "s"}`);
+          const location = String(item.location || "");
+          return `
+            <article class="reading-card">
+              <div class="problem-location">
+                <div><h2 class="reading-location">${escapeHtml(location)}</h2><div class="reading-meta">${escapeHtml(item.timestamp)} · ${escapeHtml(reasons.join(", "))}</div></div>
+                <a class="button button-link" href="${escapeHtml(mapSearchUrl(location))}" target="_blank" rel="noopener noreferrer">Open in Google Maps</a>
+              </div>
+              ${item.issueNote ? `<div class="issue-note">${escapeHtml(item.issueNote)}</div>` : ""}
+            </article>`;
+        }).join("");
+        content.innerHTML = `<div class="reading-list">${cards}</div><div class="info-note">Map links open Google Maps with the saved location as a search. Your location is sent to Google only when you open a map link.</div>`;
+      }
+
+      function renderReadings() {
+        if (!state.readings.length) {
+          content.innerHTML = `<div class="empty-state"><strong>Nothing saved yet.</strong>Add a reading to start your local sample history.<div class="form-actions" style="justify-content:center"><button class="button" data-add>＋ Add a reading</button></div></div>`;
+          content.querySelector("[data-add]").addEventListener("click", () => go("add"));
+          return;
+        }
+        const cards = state.readings.map(item => {
+          const status = statuses(item);
+          const photosHtml = Array.isArray(item.issuePhotos) && item.issuePhotos.length ? `<div class="issue-photo-grid">${item.issuePhotos.map(src => `<img src="${src}" alt="Issue photo">`).join("")}</div>` : "";
+          const noteHtml = item.issueNote ? `<div class="issue-note">${escapeHtml(item.issueNote)}</div>` : "";
+          return `
+            <article class="reading-card">
+              <div class="reading-top"><div><h2 class="reading-location">${escapeHtml(item.location)}</h2><div class="reading-meta">${escapeHtml(item.timestamp)}</div></div><span class="source-tag">${escapeHtml(item.source || "Saved")}</span></div>
+              <div class="measurements">
+                <div class="measurement"><div class="measurement-label">pH</div><div class="measurement-value">${escapeHtml(item.ph)} <span class="status-tag ${status.ph.bad ? "bad" : ""}">${status.ph.label}</span></div></div>
+                <div class="measurement"><div class="measurement-label">Turbidity</div><div class="measurement-value">${escapeHtml(item.turbidity)} NTU <span class="status-tag ${status.turbidity.bad ? "bad" : ""}">${status.turbidity.label}</span></div></div>
+                <div class="measurement"><div class="measurement-label">Dissolved oxygen</div><div class="measurement-value">${escapeHtml(item.oxygen)} mg/L <span class="status-tag ${status.oxygen.bad ? "bad" : ""}">${status.oxygen.label}</span></div></div>
+              </div>
+              ${noteHtml}
+              ${photosHtml}
+            </article>`;
+        }).join("");
+        content.innerHTML = `<div class="reading-list">${cards}</div><div class="info-note">A result outside a screening limit is a prompt for review, not a full water-safety diagnosis.</div>`;
+      }
+
+      function renderLimits() {
+        const limits = state.limits;
+        content.innerHTML = `
+          <form class="form-card" id="limitsForm" novalidate>
+            <div class="form-grid">
+              <div class="field"><label for="phMin">Minimum pH</label><input id="phMin" name="phMin" type="number" min="0" max="14" step="any" value="${limits.phMin}" required></div>
+              <div class="field"><label for="phMax">Maximum pH</label><input id="phMax" name="phMax" type="number" min="0" max="14" step="any" value="${limits.phMax}" required></div>
+              <div class="field"><label for="turbidityLimit">Turbidity limit (NTU)</label><input id="turbidityLimit" name="turbidity" type="number" min="0" step="any" value="${limits.turbidity}" required></div>
+              <div class="field"><label for="oxygenMin">Minimum dissolved oxygen (mg/L)</label><input id="oxygenMin" name="oxygen" type="number" min="0" max="20" step="any" value="${limits.oxygen}" required></div>
+            </div>
+            <p class="field-hint" style="margin:14px 0 0">These limits are screening thresholds for this preview. Changing them updates how readings are flagged.</p>
+            <p class="form-message" id="limitsError" role="alert"></p>
+            <div class="form-actions"><button class="button" type="submit">Save limits</button><button class="button secondary" type="button" data-reset>Restore defaults</button></div>
+          </form>
+        `;
+        const form = document.getElementById("limitsForm");
+        form.addEventListener("submit", event => {
+          event.preventDefault();
+          const error = document.getElementById("limitsError");
+          const next = {
+            phMin: Number(form.elements.phMin.value),
+            phMax: Number(form.elements.phMax.value),
+            turbidity: Number(form.elements.turbidity.value),
+            oxygen: Number(form.elements.oxygen.value)
+          };
+          if (Object.values(next).some(value => !Number.isFinite(value) || value < 0) || next.phMin > 14 || next.phMax > 14 || next.oxygen > 20) {
+            error.textContent = "Enter valid limits: pH 0–14, turbidity 0 or higher, and dissolved oxygen 0–20 mg/L."; return;
+          }
+          if (next.phMin > next.phMax) { error.textContent = "Minimum pH cannot be greater than maximum pH. Limits were not changed."; return; }
+          state.limits = next;
+          const saveResult = persist();
+          go("limits");
+          reportSave(saveResult, "Screening limits updated.");
+        });
+        content.querySelector("[data-reset]").addEventListener("click", () => {
+          state.limits = { ...DEFAULT_LIMITS };
+          const saveResult = persist();
+          go("limits");
+          reportSave(saveResult, "Default screening limits restored.");
+        });
+      }
+
+      function renderQuit() {
+        content.innerHTML = `
+          <div class="quit-card">
+            <div class="quit-icon" aria-hidden="true">✓</div>
+            <h2>Preview session ended</h2>
+            <p>That’s the end of the AquaTrace console simulation. Your saved readings and limits remain in this browser.</p>
+            <button class="button" data-restart>Start again</button>
+          </div>`;
+        content.querySelector("[data-restart]").addEventListener("click", () => go("home"));
+      }
+
+      document.querySelectorAll(".nav-button").forEach(button => {
+        button.addEventListener("click", () => go(button.dataset.screen));
+      });
+
+      go("home");
+      if (startupError) showToast(startupError, true);
+    })();
+  </script>
+</body>
+</html>
